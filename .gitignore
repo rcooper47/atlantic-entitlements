@@ -48,3 +48,6 @@ staticfiles/
 
 # macOS
 .DS_Store
+
+# Local-only files
+conversation-log.md
