@@ -13,12 +13,23 @@ See `planning.md` for the full design rationale.
 ## Setup
 
 ```bash
+pip install -r requirements.txt
 python3 manage.py migrate
-python3 manage.py createsuperuser   # for admin + staff-only write endpoints
+
+# create an admin/admin superuser non-interactively (for the curl examples below):
+python3 manage.py shell -c "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@test.com', 'admin')"
+
 python3 manage.py runserver
 ```
 
 The three products and their features are seeded by the `0002_seed_catalog` data migration — no manual setup required.
+
+## Authentication
+
+Two mechanisms are accepted:
+
+- **Session cookies** — log in at `/admin/`, then hit the API from the same browser.
+- **HTTP Basic auth** — pass `Authorization: Basic ...` (or `curl -u user:password`). Handled by `entitlements.middleware.BasicAuthMiddleware`, installed after Django's `AuthenticationMiddleware`. Use HTTPS in any non-local environment — Basic auth sends credentials in clear text.
 
 ## Models
 
@@ -65,14 +76,14 @@ Grant Digital to user 1:
 ```bash
 curl -X POST http://localhost:8000/api/users/1/entitlements/ \
   -H "Content-Type: application/json" \
-  -u admin:<password> \
+  -u admin:admin \
   -d '{"product_name": "Digital"}'
 ```
 
 Query current entitlements + features:
 ```bash
 curl http://localhost:8000/api/users/1/entitlements/?active=true \
-  -u admin:<password>
+  -u admin:admin
 # {
 #   "entitlements": [{"id": 1, "user_id": 1, "product_name": "Digital", ...}],
 #   "features": ["web_access"]
@@ -82,7 +93,7 @@ curl http://localhost:8000/api/users/1/entitlements/?active=true \
 Revoke (idempotent — second call is a no-op, `revoked_at` is not refreshed):
 ```bash
 curl -X DELETE http://localhost:8000/api/entitlements/1/ \
-  -u admin:<password>
+  -u admin:admin
 ```
 
 ## Programmatic access
@@ -106,4 +117,4 @@ Entitlement.objects.features_for(user, at=some_datetime)
 python3 manage.py test entitlements
 ```
 
-34 tests covering the lifecycle matrix (active, expired, revoked, time-travel, overlapping grants, idempotent revocation), model defaults, catalog seeding, and API behavior (auth, validation, status codes).
+38 tests covering the lifecycle matrix (active, expired, revoked, time-travel, overlapping grants, idempotent revocation), model defaults, catalog seeding, API behavior (auth, validation, status codes), and the Basic-auth middleware.
